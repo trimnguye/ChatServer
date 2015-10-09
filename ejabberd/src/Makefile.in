@@ -1,0 +1,79 @@
+# $Id: Makefile.in 268 2004-09-27 18:54:17Z aleksey $
+
+CC = @CC@
+CFLAGS = @CFLAGS@
+CPPFLAGS = @CPPFLAGS@
+LDFLAGS = @LDFLAGS@
+LIBS = @LIBS@
+
+EXPAT_CFLAGS = @EXPAT_CFLAGS@
+ERLANG_CFLAGS= @ERLANG_CFLAGS@
+
+EXPAT_LIBS = @EXPAT_LIBS@
+ERLANG_LIBS = @ERLANG_LIBS@
+
+prefix = @prefix@
+
+SUBDIRS = @mod_irc@ @mod_pubsub@ @mod_muc@ @eldap@ @web@ stringprep @tls@
+ERLSHLIBS = expat_erl.so
+
+DESTDIR =
+
+EJABBERDDIR = $(DESTDIR)/var/lib/ejabberd
+BEAMDIR = $(EJABBERDDIR)/ebin
+PRIVDIR = $(EJABBERDDIR)/priv
+SODIR = $(PRIVDIR)/lib
+MSGSDIR = $(PRIVDIR)/msgs
+LOGDIR = $(DESTDIR)/var/log/ejabberd
+ETCDIR = $(DESTDIR)/etc/ejabberd
+
+all: $(ERLSHLIBS) compile-beam all-recursive
+
+compile-beam:
+	@ERL@ -s make all report -noinput -s erlang halt
+
+
+all-recursive install-recursive uninstall-recursive \
+clean-recursive distclean-recursive \
+mostlyclean-recursive maintainer-clean-recursive:
+	@subdirs="$(SUBDIRS)"; for subdir in $$subdirs; do \
+	target=`echo $@|sed 's,-recursive,,'`; \
+	echo making $$target in $$subdir; \
+	(cd $$subdir && $(MAKE) $$target) || exit 1; \
+	done
+
+
+$(ERLSHLIBS):	%.so:	%.c
+			gcc -Wall $(CFLAGS) $(LDFLAGS) $(LIBS) \
+			$(subst ../,,$(subst .so,.c,$@)) \
+			$(EXPAT_LIBS) $(EXPAT_CFLAGS) \
+			$(ERLANG_LIBS) $(ERLANG_CFLAGS) \
+			-o $@ -fpic -shared
+
+install: all
+	install -d $(BEAMDIR)
+	install -m 644 *.beam $(BEAMDIR)
+	rm -f $(BEAMDIR)/configure.beam
+	install -m 644 *.app $(BEAMDIR)
+	install -d $(SODIR)
+	install -m 644 *.so $(SODIR)
+	install -d $(MSGSDIR)
+	install -m 644 msgs/*.msg $(MSGSDIR)
+	install -d $(ETCDIR)
+	install -b -m 644 ejabberd.cfg.example $(ETCDIR)/ejabberd.cfg
+	install -d $(LOGDIR)
+
+clean: clean-recursive clean-local
+
+clean-local:
+	rm -f *.beam $(ERLSHLIBS)
+
+distclean: distclean-recursive clean-local
+	rm -f config.status
+	rm -f config.log
+	rm -f Makefile
+
+TAGS:
+	etags *.erl
+
+Makefile: Makefile.in
